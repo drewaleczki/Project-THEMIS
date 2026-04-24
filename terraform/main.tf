@@ -27,13 +27,13 @@ module "iam" {
 module "airflow_ec2" {
   source = "./modules/airflow_ec2"
 
-  project_name          = var.project_name
-  environment           = var.environment
-  instance_type         = var.airflow_instance_type
-  subnet_id             = module.networking.public_subnet_id
-  vpc_id                = module.networking.vpc_id
-  ssh_key_name          = var.ssh_key_name
-  airflow_profile_name  = module.iam.airflow_profile_name
+  project_name         = var.project_name
+  environment          = var.environment
+  instance_type        = var.airflow_instance_type
+  subnet_id            = module.networking.public_subnet_id
+  vpc_id               = module.networking.vpc_id
+  ssh_key_name         = var.ssh_key_name
+  airflow_profile_name = module.iam.airflow_profile_name
 }
 
 module "emr" {
