@@ -3,7 +3,8 @@ variable "environment" { type = string }
 
 # Bronze Layer
 resource "aws_s3_bucket" "bronze" {
-  bucket = "${var.project_name}-${var.environment}-datalake-bronze"
+  bucket        = "${var.project_name}-${var.environment}-datalake-bronze"
+  force_destroy = true
 }
 resource "aws_s3_bucket_versioning" "bronze_versioning" {
   bucket = aws_s3_bucket.bronze.id
@@ -14,17 +15,20 @@ resource "aws_s3_bucket_versioning" "bronze_versioning" {
 
 # Silver Layer
 resource "aws_s3_bucket" "silver" {
-  bucket = "${var.project_name}-${var.environment}-datalake-silver"
+  bucket        = "${var.project_name}-${var.environment}-datalake-silver"
+  force_destroy = true
 }
 
 # Gold Layer
 resource "aws_s3_bucket" "gold" {
-  bucket = "${var.project_name}-${var.environment}-datalake-gold"
+  bucket        = "${var.project_name}-${var.environment}-datalake-gold"
+  force_destroy = true
 }
 
 # Logs Bucket (for EMR and Airflow)
 resource "aws_s3_bucket" "logs" {
-  bucket = "${var.project_name}-${var.environment}-datalake-logs"
+  bucket        = "${var.project_name}-${var.environment}-datalake-logs"
+  force_destroy = true
 }
 
 output "bronze_bucket_name" { value = aws_s3_bucket.bronze.id }

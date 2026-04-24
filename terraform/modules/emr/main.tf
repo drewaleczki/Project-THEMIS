@@ -10,9 +10,10 @@ variable "emr_ec2_profile_name" { type = string }
 variable "log_uri" { type = string }
 
 resource "aws_security_group" "emr_master" {
-  name        = "${var.project_name}-${var.environment}-emr-master-sg"
-  description = "Security group for EMR master"
-  vpc_id      = var.vpc_id
+  name                   = "${var.project_name}-${var.environment}-emr-master-sg"
+  description            = "Security group for EMR master"
+  vpc_id                 = var.vpc_id
+  revoke_rules_on_delete = true
 
   egress {
     from_port   = 0
@@ -23,9 +24,10 @@ resource "aws_security_group" "emr_master" {
 }
 
 resource "aws_security_group" "emr_core" {
-  name        = "${var.project_name}-${var.environment}-emr-core-sg"
-  description = "Security group for EMR core"
-  vpc_id      = var.vpc_id
+  name                   = "${var.project_name}-${var.environment}-emr-core-sg"
+  description            = "Security group for EMR core"
+  vpc_id                 = var.vpc_id
+  revoke_rules_on_delete = true
 
   egress {
     from_port   = 0
