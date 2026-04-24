@@ -4,7 +4,7 @@ variable "instance_type" { type = string }
 variable "subnet_id" { type = string }
 variable "vpc_id" { type = string }
 variable "ssh_key_name" { type = string }
-variable "airflow_iam_role_name" { type = string }
+variable "airflow_profile_name" { type = string }
 
 resource "aws_security_group" "airflow_sg" {
   name        = "${var.project_name}-${var.environment}-airflow-sg"
@@ -33,10 +33,6 @@ resource "aws_security_group" "airflow_sg" {
   }
 }
 
-data "aws_iam_instance_profile" "airflow" {
-  name = "${var.project_name}-${var.environment}-airflow-profile"
-}
-
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
@@ -53,7 +49,7 @@ resource "aws_instance" "airflow" {
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [aws_security_group.airflow_sg.id]
   key_name               = var.ssh_key_name
-  iam_instance_profile   = data.aws_iam_instance_profile.airflow.name
+  iam_instance_profile   = var.airflow_profile_name
 
   user_data = <<-EOF
               #!/bin/bash

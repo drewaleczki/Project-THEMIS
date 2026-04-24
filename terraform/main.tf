@@ -33,7 +33,7 @@ module "airflow_ec2" {
   subnet_id             = module.networking.public_subnet_id
   vpc_id                = module.networking.vpc_id
   ssh_key_name          = var.ssh_key_name
-  airflow_iam_role_name = module.iam.airflow_role_name
+  airflow_profile_name  = module.iam.airflow_profile_name
 }
 
 module "emr" {
