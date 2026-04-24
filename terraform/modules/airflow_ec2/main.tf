@@ -48,13 +48,12 @@ resource "aws_instance" "airflow" {
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [aws_security_group.airflow_sg.id]
-  key_name               = var.ssh_key_name
   iam_instance_profile   = var.airflow_profile_name
 
   user_data = <<-EOF
               #!/bin/bash
               apt-get update -y
-              apt-get install -y apt-transport-https ca-certificates curl software-properties-common python3-pip python3-venv
+              apt-get install -y apt-transport-https ca-certificates curl software-properties-common python3-pip python3-venv git
               curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
               add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
               apt-get update -y
@@ -65,6 +64,15 @@ resource "aws_instance" "airflow" {
               cd /opt/airflow
               curl -LfO 'https://airflow.apache.org/docs/apache-airflow/2.7.3/docker-compose.yaml'
               mkdir -p ./dags ./logs ./plugins ./config
+              
+              # Download pipeline scripts from Git and inject into Airflow
+              git clone https://github.com/drewaleczki/Project-THEMIS.git /tmp/Project-THEMIS || echo "Git clone failed (maybe private repo?)"
+              if [ -d "/tmp/Project-THEMIS" ]; then
+                cp -r /tmp/Project-THEMIS/airflow/dags/* ./dags/
+                cp -r /tmp/Project-THEMIS/pipelines ./dags/
+                cp -r /tmp/Project-THEMIS/spark_jobs ./dags/
+              fi
+              
               echo -e "AIRFLOW_UID=$(id -u ubuntu)" > .env
               
               # Wait for docker to be ready
