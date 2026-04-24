@@ -1,4 +1,4 @@
-# Project THEMIS
+# Project THEMIS ⚖️
 
 A Production-Grade Big Data platform for ingesting, processing, and analyzing Brazilian public political data (e.g., Electoral Data, Parliamentary Expenses).
 

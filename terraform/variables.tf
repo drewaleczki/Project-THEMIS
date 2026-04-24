@@ -25,7 +25,7 @@ variable "vpc_cidr" {
 variable "airflow_instance_type" {
   description = "EC2 instance type for Airflow"
   type        = string
-  default     = "t3.medium"
+  default     = "t3.large"
 }
 
 variable "emr_master_instance_type" {

@@ -50,6 +50,11 @@ resource "aws_instance" "airflow" {
   vpc_security_group_ids = [aws_security_group.airflow_sg.id]
   iam_instance_profile   = var.airflow_profile_name
 
+  root_block_device {
+    volume_size = 30
+    volume_type = "gp3"
+  }
+
   user_data = <<-EOF
               #!/bin/bash
               apt-get update -y
@@ -78,6 +83,9 @@ resource "aws_instance" "airflow" {
               # Wait for docker to be ready
               systemctl enable docker
               systemctl start docker
+              
+              # Initialize Airflow Database and Admin user (MANDATORY)
+              docker compose up airflow-init
               
               # Start Airflow
               docker compose up -d
