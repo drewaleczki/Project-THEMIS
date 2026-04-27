@@ -35,9 +35,9 @@ This project is built using **AWS** and managed entirely via **Terraform** using
 ├── terraform/
 │   ├── modules/
 │   │   ├── airflow_ec2/           # EC2 instance bootstrapping Airflow
-│   │   ├── emr/                   # EMR cluster template and security groups
 │   │   ├── iam/                   # IAM Roles for EMR, Airflow, and S3 access
 │   │   ├── networking/            # VPC, Subnets, IGW, Route Tables
+│   │   ├── rds/                   # PostgreSQL RDS for Airflow Metadata
 │   │   └── s3_datalake/           # Bronze, Silver, Gold, and Logs buckets
 │   ├── main.tf                    # Root module calling all components
 │   ├── providers.tf               # AWS provider and S3 Backend configuration
@@ -55,6 +55,7 @@ This project is configured with automated processes to provision and destroy clo
 2. **GitHub Secrets**: In your repository, go to **Settings > Secrets and variables > Actions**, and create the following Repository Secrets:
    - `AWS_ACCESS_KEY_ID`: Your IAM access key.
    - `AWS_SECRET_ACCESS_KEY`: Your IAM secret key.
+   - `DB_PASSWORD`: The secure password for the Airflow RDS PostgreSQL database.
 
 > [!WARNING]
 > Ensure the `.gitignore` remains intact so you do not accidentally upload your local `.tfstate` or any `.tfvars` files. Required credentials MUST only exist in GitHub Actions Secrets!
@@ -82,7 +83,7 @@ To clean up your AWS account and prevent unexpected billing:
 1. **Ingestion**: `pipelines/ingest_data.py` executes, pulling large datasets from sources into the S3 Bronze bucket.
 2. **Cluster Creation**: Airflow provisions a transient EMR PySpark Cluster.
 3. **Bronze -> Silver**: Cleans the data, rectifies encodings to `utf-8`, and writes Snappy compressed Parquet.
-4. **Data Quality**: Validates that records don't contain null core identifiers or negative values.
+4. **Data Quality**: Validates that records don't contain null core identifiers or negative values. (Currently simulated via a Mock task; actual implementation pending in `spark_jobs/data_quality.py`).
 5. **Silver -> Gold**: Aggregates campaign expenditures and creates the analytical Parquet layer.
 6. **Cluster Termination**: The cluster terminates automatically to save costs.
 
