@@ -3,6 +3,7 @@ variable "environment" { type = string }
 variable "s3_bronze_arn" { type = string }
 variable "s3_silver_arn" { type = string }
 variable "s3_gold_arn" { type = string }
+variable "s3_logs_arn" { type = string }
 
 # Airflow EC2 Role
 resource "aws_iam_role" "airflow_role" {
@@ -28,7 +29,8 @@ resource "aws_iam_policy" "airflow_s3_policy" {
         Resource = [
           var.s3_bronze_arn, "${var.s3_bronze_arn}/*",
           var.s3_silver_arn, "${var.s3_silver_arn}/*",
-          var.s3_gold_arn, "${var.s3_gold_arn}/*"
+          var.s3_gold_arn, "${var.s3_gold_arn}/*",
+          var.s3_logs_arn, "${var.s3_logs_arn}/*"
         ]
       },
       {

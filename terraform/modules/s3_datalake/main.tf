@@ -42,3 +42,4 @@ output "gold_bucket_arn" { value = aws_s3_bucket.gold.arn }
 
 output "logs_bucket_name" { value = aws_s3_bucket.logs.id }
 output "logs_bucket_uri" { value = "s3://${aws_s3_bucket.logs.id}/" }
+output "logs_bucket_arn" { value = aws_s3_bucket.logs.arn }
