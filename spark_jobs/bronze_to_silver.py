@@ -6,14 +6,14 @@ from pyspark.sql.functions import col, lower, trim, regexp_replace, to_date, whe
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def main(date_partition, bronze_bucket, silver_bucket):
+def main(domain, year, bronze_bucket, silver_bucket):
     spark = SparkSession.builder \
-        .appName("THEMIS_Bronze_to_Silver") \
+        .appName(f"THEMIS_Bronze_to_Silver_{domain}_{year}") \
         .getOrCreate()
 
-    # E.g. s3://themis-dev-datalake-bronze/tse_campaigns/raw/ingestion_date=2026-04-23/
-    input_path = f"s3://{bronze_bucket}/tse_campaigns/raw/ingestion_date={date_partition}/"
-    output_path = f"s3://{silver_bucket}/tse_campaigns/clean/ingestion_date={date_partition}/"
+    # Read from the domain and year partition logic used by ingest_data.py
+    input_path = f"s3://{bronze_bucket}/tse/{domain}/ano={year}/"
+    output_path = f"s3://{silver_bucket}/tse/{domain}/silver/ano={year}/"
 
     logger.info(f"Reading from {input_path}")
     
@@ -64,9 +64,10 @@ def main(date_partition, bronze_bucket, silver_bucket):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--date', required=True, help="Ingestion date partition (YYYY-MM-DD)")
+    parser.add_argument('--domain', required=True, help="Domain, e.g., receitas")
+    parser.add_argument('--year', required=True, help="Election year, e.g., 2022")
     parser.add_argument('--bronze_bucket', required=True, help="Bronze Bucket Name")
     parser.add_argument('--silver_bucket', required=True, help="Silver Bucket Name")
     args = parser.parse_args()
     
-    main(args.date, args.bronze_bucket, args.silver_bucket)
+    main(args.domain, args.year, args.bronze_bucket, args.silver_bucket)

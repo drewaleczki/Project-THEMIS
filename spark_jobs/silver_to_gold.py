@@ -6,13 +6,13 @@ from pyspark.sql.functions import col, sum, count
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def main(date_partition, silver_bucket, gold_bucket):
+def main(domain, year, silver_bucket, gold_bucket):
     spark = SparkSession.builder \
-        .appName("THEMIS_Silver_to_Gold") \
+        .appName(f"THEMIS_Silver_to_Gold_{domain}_{year}") \
         .getOrCreate()
 
-    silver_path = f"s3://{silver_bucket}/tse_campaigns/clean/ingestion_date={date_partition}/"
-    output_path = f"s3://{gold_bucket}/tse_campaigns/analytical/ingestion_date={date_partition}/"
+    silver_path = f"s3://{silver_bucket}/tse/{domain}/silver/ano={year}/"
+    output_path = f"s3://{gold_bucket}/tse/{domain}/gold/ano={year}/"
 
     logger.info(f"Reading Silver Data from {silver_path}")
     df = spark.read.parquet(silver_path)
@@ -40,9 +40,10 @@ def main(date_partition, silver_bucket, gold_bucket):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--date', required=True)
+    parser.add_argument('--domain', required=True)
+    parser.add_argument('--year', required=True)
     parser.add_argument('--silver_bucket', required=True)
     parser.add_argument('--gold_bucket', required=True)
     args = parser.parse_args()
     
-    main(args.date, args.silver_bucket, args.gold_bucket)
+    main(args.domain, args.year, args.silver_bucket, args.gold_bucket)

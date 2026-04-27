@@ -73,7 +73,7 @@ def run_tse_ingestion(url: str, domain: str, year: str):
         
         if not extracted_file_path:
             logger.error(f"Could not find a unified BRASIL CSV inside the ZIP from {url}")
-            return
+            raise FileNotFoundError(f"Missing BRASIL CSV in downloaded ZIP for {domain}")
             
         # 3. Upload to Bronze Layer
         file_basename = os.path.basename(extracted_file_path)
