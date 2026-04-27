@@ -59,19 +59,19 @@ resource "aws_instance" "airflow" {
   }
 
   user_data = <<-EOF
-              #!/bin/bash
-              apt-get update -y
-              apt-get install -y apt-transport-https ca-certificates curl software-properties-common python3-pip python3-venv git
-              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-              add-apt-repository -y "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-              apt-get update -y
-              apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-              usermod -aG docker ubuntu
-              
-              mkdir -p /opt/airflow
-              cd /opt/airflow
-              
-              cat << 'DOCKERCOMPOSE' > docker-compose.yaml
+#!/bin/bash
+apt-get update -y
+apt-get install -y apt-transport-https ca-certificates curl software-properties-common python3-pip python3-venv git
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+add-apt-repository -y "deb [arch=amd64] https://download.docker.com/linux/ubuntu $$(lsb_release -cs) stable"
+apt-get update -y
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+usermod -aG docker ubuntu
+
+mkdir -p /opt/airflow
+cd /opt/airflow
+
+cat << 'DOCKERCOMPOSE' > docker-compose.yaml
 version: '3.8'
 x-airflow-common:
   &airflow-common
@@ -102,32 +102,32 @@ services:
     command: scheduler
 DOCKERCOMPOSE
 
-              mkdir -p ./dags ./logs ./plugins ./config
-              
-              # Download pipeline scripts from Git and inject into Airflow
-              git clone https://github.com/drewaleczki/Project-THEMIS.git /tmp/Project-THEMIS || echo "Git clone failed (maybe private repo?)"
-              if [ -d "/tmp/Project-THEMIS" ]; then
-                cp -r /tmp/Project-THEMIS/airflow/dags/* ./dags/
-                cp -r /tmp/Project-THEMIS/pipelines ./dags/
-                cp -r /tmp/Project-THEMIS/spark_jobs ./dags/
-              fi
-              
-              echo -e "AIRFLOW_UID=1000" > .env
-              
-              # Fix permissions so Airflow containers (running as ubuntu) can write to these directories
-              chown -R ubuntu:ubuntu /opt/airflow
-              
-              # Wait for docker to be ready
-              systemctl enable docker
-              systemctl start docker
-              
-              # Initialize Airflow Database and Admin user (MANDATORY)
-              docker compose run --rm airflow-webserver airflow db upgrade
-              docker compose run --rm airflow-webserver airflow users create -r Admin -u admin -p admin -e admin@example.com -f admin -l user
-              
-              # Start Airflow
-              docker compose up -d
-              EOF
+mkdir -p ./dags ./logs ./plugins ./config
+
+# Download pipeline scripts from Git and inject into Airflow
+git clone https://github.com/drewaleczki/Project-THEMIS.git /tmp/Project-THEMIS || echo "Git clone failed (maybe private repo?)"
+if [ -d "/tmp/Project-THEMIS" ]; then
+  cp -r /tmp/Project-THEMIS/airflow/dags/* ./dags/
+  cp -r /tmp/Project-THEMIS/pipelines ./dags/
+  cp -r /tmp/Project-THEMIS/spark_jobs ./dags/
+fi
+
+echo -e "AIRFLOW_UID=1000" > .env
+
+# Fix permissions so Airflow containers (running as ubuntu) can write to these directories
+chown -R ubuntu:ubuntu /opt/airflow
+
+# Wait for docker to be ready
+systemctl enable docker
+systemctl start docker
+
+# Initialize Airflow Database and Admin user (MANDATORY)
+docker compose run --rm airflow-webserver airflow db upgrade
+docker compose run --rm airflow-webserver airflow users create -r Admin -u admin -p admin -e admin@example.com -f admin -l user
+
+# Start Airflow
+docker compose up -d
+EOF
 
   tags = {
     Name = "${var.project_name}-${var.environment}-airflow"
