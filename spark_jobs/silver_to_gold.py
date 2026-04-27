@@ -21,8 +21,12 @@ def main(domain, year, silver_bucket, gold_bucket):
     value_cols = [c for c in df.columns if c.startswith('vr_')]
     target_value_col = value_cols[0] if value_cols else None
     
-    if 'nm_candidato' in df.columns and target_value_col:
-        agg_df = df.groupBy("nm_candidato") \
+    # Find candidate identifier
+    cand_cols = [c for c in df.columns if c in ['nm_candidato', 'sq_candidato']]
+    target_cand_col = cand_cols[0] if cand_cols else None
+
+    if target_cand_col and target_value_col:
+        agg_df = df.groupBy(target_cand_col) \
                    .agg(
                        sum(target_value_col).alias(f"total_{target_value_col}"),
                        count("*").alias("qtd_registros")
