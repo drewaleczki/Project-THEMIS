@@ -30,7 +30,7 @@ resource "aws_db_instance" "airflow_db" {
   identifier             = "${var.project_name}-${var.environment}-airflow-db"
   allocated_storage      = 20
   engine                 = "postgres"
-  engine_version         = "15.4" # AWS default supported version
+  engine_version         = "15" # Allow AWS to pick the supported minor version
   instance_class         = "db.t3.micro"
   username               = var.db_username
   password               = var.db_password
