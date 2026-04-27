@@ -82,6 +82,7 @@ x-airflow-common:
     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${var.db_username}:${var.db_password}@${var.rds_endpoint}/postgres
     - AIRFLOW__CORE__LOAD_EXAMPLES=false
     - AIRFLOW_UID=1000
+    - _PIP_ADDITIONAL_REQUIREMENTS=awscli
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
