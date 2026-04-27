@@ -25,19 +25,19 @@ variable "vpc_cidr" {
 variable "airflow_instance_type" {
   description = "EC2 instance type for Airflow"
   type        = string
-  default     = "t3.large"
+  default     = "t3.small"
 }
 
-variable "emr_master_instance_type" {
-  description = "Instance type for EMR master node"
+variable "db_username" {
+  description = "RDS DB Username"
   type        = string
-  default     = "m5.xlarge"
+  default     = "airflow_user"
 }
 
-variable "emr_core_instance_type" {
-  description = "Instance type for EMR core nodes"
+variable "db_password" {
+  description = "RDS DB Password"
   type        = string
-  default     = "m5.xlarge"
+  default     = "SecurePass123!" # Ideally passed via TF_VAR_db_password
 }
 
 variable "ssh_key_name" {

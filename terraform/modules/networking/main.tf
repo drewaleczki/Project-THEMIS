@@ -56,3 +56,32 @@ output "vpc_id" {
 output "public_subnet_id" {
   value = aws_subnet.public.id
 }
+
+resource "aws_subnet" "public_2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = cidrsubnet(var.vpc_cidr, 8, 2)
+  map_public_ip_on_launch = true
+  availability_zone       = "${var.aws_region}b"
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-public-subnet-2"
+  }
+}
+
+resource "aws_route_table_association" "public_2" {
+  subnet_id      = aws_subnet.public_2.id
+  route_table_id = aws_route_table.public_rt.id
+}
+
+resource "aws_db_subnet_group" "db_subnet" {
+  name       = "${var.project_name}-${var.environment}-db-subnet-group"
+  subnet_ids = [aws_subnet.public.id, aws_subnet.public_2.id]
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-db-subnet-group"
+  }
+}
+
+output "db_subnet_group_name" {
+  value = aws_db_subnet_group.db_subnet.name
+}
