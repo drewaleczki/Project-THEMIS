@@ -76,6 +76,7 @@ version: '3.8'
 x-airflow-common:
   &airflow-common
   image: apache/airflow:2.7.3
+  user: "1000:0"
   environment:
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${var.db_username}:${var.db_password}@${var.rds_endpoint}/postgres
