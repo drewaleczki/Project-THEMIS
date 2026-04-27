@@ -35,7 +35,7 @@ resource "aws_iam_policy" "airflow_s3_policy" {
       },
       {
         Effect   = "Allow"
-        Action   = ["elasticmapreduce:RunJobFlow", "elasticmapreduce:AddJobFlowSteps", "elasticmapreduce:DescribeStep", "elasticmapreduce:ListSteps", "elasticmapreduce:TerminateJobFlows", "iam:PassRole"]
+        Action   = ["elasticmapreduce:RunJobFlow", "elasticmapreduce:AddJobFlowSteps", "elasticmapreduce:DescribeStep", "elasticmapreduce:ListSteps", "elasticmapreduce:TerminateJobFlows", "elasticmapreduce:DescribeCluster", "iam:PassRole"]
         Resource = "*"
       }
     ]
