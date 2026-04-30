@@ -24,6 +24,12 @@ def upload_to_s3(file_path: str, bucket: str, object_name: str) -> bool:
         return False
     return True
 
+def s3_prefix_has_files(bucket: str, prefix: str) -> bool:
+    """Check if any files exist under the given S3 prefix"""
+    s3_client = boto3.client('s3')
+    response = s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix)
+    return 'Contents' in response and len(response['Contents']) > 0
+
 def download_file(url: str, local_path: str):
     """Download large files (like ZIPs) to local path chunk by chunk"""
     logger.info(f"Downloading data from {url} to {local_path} ...")
@@ -44,6 +50,11 @@ def run_tse_ingestion(url: str, domain: str, year: str):
     4. Uploads it to S3 following the structure: bronze/tse/{domain}/ano={year}/
     5. Cleans up /tmp storage
     """
+    s3_prefix = f"tse/{domain}/ano={year}/"
+    if s3_prefix_has_files(BRONZE_BUCKET, s3_prefix):
+        logger.info(f"Data already exists in s3://{BRONZE_BUCKET}/{s3_prefix}. Skipping ingestion.")
+        return
+
     temp_dir = f"/tmp/themis_ingestion_{domain}_{year}"
     
     # Prune dir if exists from previous crashed runs
@@ -62,10 +73,10 @@ def run_tse_ingestion(url: str, domain: str, year: str):
         extracted_file_path = None
         
         with zipfile.ZipFile(local_zip_path, 'r') as z:
-            # Look for any .csv file containing 'BRASIL' or 'BR' in its name
+            # Look for any .csv file containing 'BRASIL' in its name (consolidated data)
             for file_info in z.infolist():
                 filename_upper = file_info.filename.upper()
-                if filename_upper.endswith('.CSV') and ('BRASIL' in filename_upper or 'BR.CSV' in filename_upper):
+                if filename_upper.endswith('.CSV') and 'BRASIL' in filename_upper:
                     logger.info(f"Found target unified file: {file_info.filename}. Extracting...")
                     z.extract(file_info, temp_dir)
                     extracted_file_path = os.path.join(temp_dir, file_info.filename)
