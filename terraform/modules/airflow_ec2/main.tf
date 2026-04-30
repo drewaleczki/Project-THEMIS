@@ -83,6 +83,7 @@ x-airflow-common:
     - AIRFLOW__CORE__LOAD_EXAMPLES=false
     - AIRFLOW_UID=1000
     - _PIP_ADDITIONAL_REQUIREMENTS=awscli
+    - AWS_DEFAULT_REGION=us-east-1
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
