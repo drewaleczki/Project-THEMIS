@@ -1,105 +1,118 @@
 # Project THEMIS ⚖️
 
-A Production-Grade Big Data platform for ingesting, processing, and analyzing Brazilian public political data (e.g., Electoral Data, Parliamentary Expenses).
+![Project Architecture](docs/assets/architecture.png)
+*High-level architecture of Project THEMIS data pipelines and infrastructure.*
 
-## Data Sources
+A Production-Grade Big Data platform for ingesting, processing, and analyzing Brazilian public political data. 
 
-This project natively consumes public electoral transparency data from the **Tribunal Superior Eleitoral (TSE)**. The Airflow pipelines are configured to extract `.zip` files directly from the [Portal de Dados Abertos do TSE](https://dadosabertos.tse.jus.br/). Datasets consumed include candidates demographics, campaign finance (receipts and expenses), asset declarations, and voting results.
+**🎯 Business Objective (Electoral ROI):** The core objective of Project THEMIS is to correlate declared assets, campaign expenditures, and received votes to calculate the **Cost per Vote** and the Return on Investment (ROI) of every political candidate in Brazil, consolidating billions of records into a single analytical *Wide Table* (Gold Layer).
 
-## Architecture
+---
 
-This project is built using **AWS** and managed entirely via **Terraform** using a **Medallion Architecture**.
+## 🛠️ Tooling & Architecture Choices
 
-* **S3 Data Lake**: Segregated into Bronze (Raw), Silver (Cleaned, Parquet format), and Gold (Aggregated Business Logic).
-* **Compute Engine**: Apache Spark running on transient Amazon EMR clusters.
-* **Orchestration**: Apache Airflow running on a dedicated Amazon EC2 instance (Dockerized).
-* **Data Catalog & Querying**: AWS Glue Data Catalog and Amazon Athena.
-* **CI/CD**: Fully automated deployment and teardown using GitHub Actions.
+A robust data platform is built not just on tools, but on the right tools for specific problems. Here is the reasoning behind the technology stack:
 
-## Project Structure
+### 1. Infrastructure as Code: Terraform
+Instead of manually clicking through the AWS Console (ClickOps), **Terraform** was chosen to guarantee reproducibility. Every resource (VPC, S3, IAM Roles, EMR settings) is codified. This allows the entire infrastructure to be spun up or destroyed in minutes via CI/CD, eliminating configuration drift and manual errors.
+
+### 2. Orchestration: Apache Airflow (Dockerized on EC2)
+**Airflow** is the industry standard for scheduling and orchestrating data pipelines. It was chosen over AWS Step Functions because of its dynamic, Python-based DAG generation and its vast ecosystem of providers. By containerizing Airflow on a lightweight EC2 instance, we maintain full control over the environment while keeping orchestration decoupled from heavy processing.
+
+### 3. Data Lake Storage: Amazon S3 (Medallion Architecture)
+**Amazon S3** provides highly durable, inexpensive object storage. The data lake is logically separated into the **Medallion Architecture**:
+* **Bronze:** Raw data as ingested from the source (mostly CSVs extracted from ZIPs).
+* **Silver:** Cleansed data, schema-enforced, and converted to columnar `Parquet` format with Snappy compression for query optimization.
+* **Gold:** Business-level aggregated data (Wide Tables) ready for analytical consumption.
+
+### 4. Distributed Compute: Apache Spark on Amazon EMR
+Given the volume of data (millions of rows of electoral expenses and votes), single-node processing (e.g., Pandas) would result in Out-Of-Memory (OOM) errors. **Apache Spark** allows distributed, in-memory processing. We chose **Amazon EMR** to run Spark because it provides managed transient clusters that Airflow can spin up, submit jobs to, and terminate, meaning we only pay for compute exactly when data is being processed.
+
+### 5. Data Discovery & Analytics: AWS Glue & Amazon Athena
+To allow end-users to query the data instantly without writing DDL statements, an **AWS Glue Crawler** automatically sweeps the Gold bucket, infers the schema, and populates the Glue Data Catalog. **Amazon Athena** is then used as a serverless query engine to run standard SQL directly on top of the S3 Parquet files.
+
+---
+
+## 🏗️ Architectural Trade-offs
+
+As a project aimed at demonstrating production readiness, several architectural trade-offs were consciously made:
+
+1. **Local Ingestion vs. Direct S3 Streaming:** The `.zip` file format holds its central directory (index) at the end of the file. Therefore, it is technically unfeasible to extract specific files (*_BRASIL.csv*) via direct streaming from the internet to S3. We opted to use the EC2 instance's disk for downloading and sequential extraction, ensuring stability against connection drops from the TSE servers.
+2. **FinOps & EMR Spot Instances:** Purely *On-Demand* EMR clusters generate high idle costs. To reduce processing costs by up to 90%, our DAG configures the EMR Master Node as *On-Demand* (ensuring job stability) and the Processing Nodes (Core) using **SPOT** market pricing.
+3. **Security (Hardening):** Given this is an ephemeral infrastructure destroyed via CI/CD, RDS (PostgreSQL) and AWS access keys are injected via **GitHub Secrets** during deployment. In a persistent corporate environment, these credentials would strictly reside in **AWS Secrets Manager** or HashiCorp Vault.
+4. **Data Quality Strategy (PySpark vs. dbt):** Since we are generating the datasets from scratch (In-Memory Processing), we enforce data quality tests (null removal, logical asserts, volume thresholds) natively in PySpark *before* writing to S3. This guarantees that corrupted data never enters the Data Lake (Fail-Fast), which is a preferable approach over using dbt for the Silver layer (which validates data post-write).
+
+---
+
+## ⚙️ Step-by-Step Pipeline Execution
+
+When the pipeline is triggered, the following sequential process occurs autonomously:
+
+1. **Infrastructure Deployment:** GitHub Actions runs `terraform apply`, provisioning the network, S3 buckets, IAM roles, RDS database, and the Airflow EC2 instance.
+2. **Data Ingestion:** Airflow triggers Python scripts that download heavy `.zip` files from the TSE portal. The scripts extract only the national consolidated files (`*_BRASIL.csv`) and upload them to the **Bronze** S3 bucket.
+3. **Transient EMR Provisioning:** Airflow dynamically provisions an Amazon EMR cluster (Spark).
+4. **Bronze to Silver (Data Quality):** Airflow submits a PySpark job to EMR. Spark reads the raw CSVs, normalizes column names, casts numeric types, and runs **Data Quality checks**. If a dataset is empty or lacks primary keys, the job fails fast. If it passes, data is saved as compressed Parquet in the **Silver** bucket.
+5. **Silver to Gold (Business Logic):** A second PySpark job reads the Silver datasets, using the `candidatos` dimension as the spine to left-join total assets, total expenses, and total votes. The job calculates the Electoral ROI (`custo_por_voto`) and writes the Wide Table to the **Gold** bucket, partitioned by State and Political Office.
+6. **Cost Optimization (Cluster Termination):** Regardless of success or failure, Airflow triggers the immediate termination of the EMR cluster to halt billing.
+7. **Automated Data Discovery:** Airflow triggers the AWS Glue Crawler, which updates the Athena catalog partitions. The data is instantly available for SQL querying.
+
+---
+
+## 📁 Project Structure
 
 ```text
-├── .github/
-│   └── workflows/
-│       ├── terraform-deploy.yml   # CI/CD pipeline for provisioning infrastructure
-│       └── terraform-destroy.yml  # Manual pipeline for destroying infrastructure
-├── airflow/
-│   └── dags/
-│       └── themis_dag.py          # Orchestration pipeline
-├── pipelines/
-│   └── ingest_data.py             # Python script for data ingestion (APIs/CSVs)
-├── spark_jobs/
-│   ├── bronze_to_silver.py        # PySpark Bronze to Silver transformation
-│   ├── data_quality.py            # Data quality checks on the Silver layer
-│   └── silver_to_gold.py          # PySpark Silver to Gold aggregation
-├── terraform/
-│   ├── modules/
-│   │   ├── airflow_ec2/           # EC2 instance bootstrapping Airflow
-│   │   ├── iam/                   # IAM Roles for EMR, Airflow, and S3 access
-│   │   ├── networking/            # VPC, Subnets, IGW, Route Tables
-│   │   ├── rds/                   # PostgreSQL RDS for Airflow Metadata
-│   │   └── s3_datalake/           # Bronze, Silver, Gold, and Logs buckets
-│   ├── main.tf                    # Root module calling all components
-│   ├── providers.tf               # AWS provider and S3 Backend configuration
-│   └── variables.tf               # Terraform input variables
-├── .gitignore                     # Git configuration ignoring states and credentials
+├── .github/workflows/         # CI/CD pipelines (Terraform Deploy/Destroy)
+├── airflow/dags/              # Orchestration pipeline (themis_dag.py)
+├── pipelines/                 # Data ingestion scripts
+├── spark_jobs/                # PySpark transformations (Bronze->Silver->Gold)
+├── terraform/                 # Infrastructure as Code (AWS resources)
 └── README.md
 ```
 
-## CI/CD with GitHub Actions
+---
 
-This project is configured with automated processes to provision and destroy cloud resources via **GitHub Actions**.
+## 🚀 How to Run the Project
 
-### Prerequisites (Before using Actions)
-1. **S3 Backend**: Create an S3 Bucket in your AWS account to store the `terraform.tfstate`. Change the default bucket name in `terraform/providers.tf` (`themis-terraform-state-bucket-unique-123`) to your real bucket name.
-2. **GitHub Secrets**: In your repository, go to **Settings > Secrets and variables > Actions**, and create the following Repository Secrets:
-   - `AWS_ACCESS_KEY_ID`: Your IAM access key.
-   - `AWS_SECRET_ACCESS_KEY`: Your IAM secret key.
-   - `DB_PASSWORD`: The secure password for the Airflow RDS PostgreSQL database.
+### Prerequisites
+1. **S3 Backend**: Create an S3 Bucket in your AWS account to store the `terraform.tfstate`. Update `terraform/providers.tf` with your bucket name.
+2. **GitHub Secrets**: Create the following Repository Secrets:
+   - `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
+   - `DB_PASSWORD`: Password for the Airflow RDS database.
 
-> [!WARNING]
-> Ensure the `.gitignore` remains intact so you do not accidentally upload your local `.tfstate` or any `.tfvars` files. Required credentials MUST only exist in GitHub Actions Secrets!
+### Deploy and Destroy
+- **Deploy**: A push to `main` modifying `/terraform` triggers the deployment via GitHub Actions.
+- **Run Pipeline**: Find the EC2 instance named `themis-dev-airflow` in AWS. Access Airflow at `http://<EC2-PUBLIC-IP>:8080` and trigger the `themis_orchestration_pipeline` DAG.
+- **Destroy**: Manually trigger the `Terraform Destroy` workflow in the Actions tab to wipe out the environment and prevent billing.
 
-### Deploying the Infrastructure
-Whenever a **push is made to the `main` branch** modifying files inside `/terraform`, the `Terraform Deploy` workflow will automatically map and deploy the changes to your AWS account.
-* You can also trigger it manually by navigating to the **Actions** tab → **Terraform Deploy** → **Run Workflow**.
+---
 
-### Destroying the Infrastructure
-To clean up your AWS account and prevent unexpected billing:
-1. Go to the **Actions** tab in GitHub.
-2. Select the **Terraform Destroy** workflow.
-3. Click _Run workflow_.
-4. Type `destroy` (lowercase) in the confirmation prompt. The environment will be completely wiped out in a few minutes.
+## 📊 Querying Data (Amazon Athena)
 
-## How to Run the Pipeline (Post-Deploy)
+Thanks to the automated **AWS Glue Crawler** triggered by Airflow at the end of the pipeline, the data catalog is automatically populated. You do not need to configure any DDL or crawlers manually. 
 
-1. Go to your AWS EC2 Console and find the instance named `themis-dev-airflow`.
-2. Copy its public IP.
-3. Access Airflow at `http://<EC2-PUBLIC-IP>:8080`.
-4. Run the DAG `themis_orchestration_pipeline`.
-
-### Pipeline Execution Flow
-
-1. **Ingestion**: `pipelines/ingest_data.py` executes, pulling large datasets from sources into the S3 Bronze bucket.
-2. **Cluster Creation**: Airflow provisions a transient EMR PySpark Cluster.
-3. **Bronze -> Silver**: Cleans the data, rectifies encodings to `utf-8`, and writes Snappy compressed Parquet.
-4. **Data Quality**: Validates that records don't contain null core identifiers or negative values. (Currently simulated via a Mock task; actual implementation pending in `spark_jobs/data_quality.py`).
-5. **Silver -> Gold**: Aggregates campaign expenditures and creates the analytical Parquet layer.
-6. **Cluster Termination**: The cluster terminates automatically to save costs.
-
-## Querying Data (Amazon Athena)
-
-Once the data reaches the Gold layer, you can create an AWS Glue Crawler to index the data. To query it, use **Amazon Athena**:
+To query the data, simply open **Amazon Athena** in your AWS Console:
 
 ```sql
--- Example query calculating total funds raised per candidate
-SELECT nome_candidato, total_arrecadado
-FROM "themis_gold_db"."campaigns_analytical"
-ORDER BY total_arrecadado DESC
+-- Analyzing Candidates' Cost per Vote
+SELECT 
+  nm_candidato, 
+  sg_uf,
+  ds_cargo,
+  qt_votos, 
+  total_vr_despesa, 
+  custo_por_voto
+FROM "themis_gold_db"."campaign_analytics"
+ORDER BY custo_por_voto ASC
 LIMIT 10;
 ```
 
-## Troubleshooting & Failure Mitigations
+---
 
-* **Schema Changes in Input**: If the input CSV changes columns, the standard `data_quality.py` step will catch missing core columns and fail the Silver step, preventing corruption in Gold.
-* **Cost Overruns**: EMR clusters are explicitly configured in Airflow to terminate on the `all_done` trigger rule, guaranteeing shutdown even on failures.
+## 📸 Project Showcase
+
+*(Images placeholder: Run the pipeline and add the screenshots to `docs/assets/`)*
+1. **Infrastructure Deployment (GitHub Actions)**
+2. **Orchestration (Apache Airflow)**
+3. **AWS Resources (EMR/EC2)**
+4. **Data Lake Structure (Amazon S3)**
+5. **Final Analytics (Amazon Athena)**

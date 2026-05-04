@@ -51,3 +51,11 @@ module "rds" {
   db_username          = var.db_username
   db_password          = var.db_password
 }
+
+module "glue" {
+  source         = "./modules/glue"
+  project_name   = var.project_name
+  environment    = var.environment
+  glue_role_arn  = module.iam.glue_role_arn
+  gold_bucket_id = module.s3_datalake.gold_bucket_name
+}

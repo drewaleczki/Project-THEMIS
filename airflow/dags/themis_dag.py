@@ -161,32 +161,29 @@ with DAG(
         python_callable=mock_data_quality_task
     )
 
-    # Generate steps for Silver -> Gold
-    silver_to_gold_steps = []
-    for domain in TSE_DATASETS.keys():
-        silver_to_gold_steps.append({
-            'Name': f'Process {domain} Silver->Gold',
+    # Task 7: Add Gold Steps (Wide Table Analytics)
+    process_gold = EmrAddStepsOperator(
+        task_id='add_gold_steps',
+        job_flow_id="{{ task_instance.xcom_pull(task_ids='create_emr_cluster', key='return_value') }}",
+        aws_conn_id='aws_default',
+        steps=[{
+            'Name': 'Build Gold Analytics Wide Table',
             'ActionOnFailure': 'CANCEL_AND_WAIT',
             'HadoopJarStep': {
                 'Jar': 'command-runner.jar',
                 'Args': [
                     'spark-submit',
                     '--deploy-mode', 'cluster',
-                    's3://themis-dev-datalake-logs/scripts/silver_to_gold.py',
-                    '--domain', domain,
+                    '--driver-memory', '2g',
+                    '--executor-memory', '4g',
+                    '--executor-cores', '2',
+                    's3://themis-dev-datalake-logs/scripts/build_gold_analytics.py',
                     '--year', '2022',
                     '--silver_bucket', 'themis-dev-datalake-silver',
                     '--gold_bucket', 'themis-dev-datalake-gold'
                 ]
             }
-        })
-
-    # Task 7: Add Gold Steps
-    process_gold = EmrAddStepsOperator(
-        task_id='add_gold_steps',
-        job_flow_id="{{ task_instance.xcom_pull(task_ids='create_emr_cluster', key='return_value') }}",
-        aws_conn_id='aws_default',
-        steps=silver_to_gold_steps,
+        }],
     )
 
     # Task 8: Wait for Gold Steps to complete
@@ -204,9 +201,18 @@ with DAG(
         trigger_rule='all_done' # ensure termination even if a step fails
     )
 
+    # Task 10: Trigger AWS Glue Crawler to update Athena Catalog
+    trigger_glue_crawler = BashOperator(
+        task_id='trigger_glue_crawler',
+        bash_command='aws glue start-crawler --name themis-dev-gold-crawler || echo "Crawler already running or error"'
+    )
+
     # Define dependencies
     for ingest_task in ingestion_tasks:
         ingest_task >> create_emr_cluster
         
     create_emr_cluster >> wait_for_cluster >> process_silver >> wait_for_silver
-    wait_for_silver >> validate_silver >> process_gold >> wait_for_gold >> terminate_emr_cluster
+    wait_for_silver >> validate_silver >> process_gold >> wait_for_gold
+    
+    wait_for_gold >> terminate_emr_cluster
+    wait_for_gold >> trigger_glue_crawler
