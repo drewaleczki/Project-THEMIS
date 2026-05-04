@@ -88,6 +88,7 @@ with DAG(
     )
 
     ingestion_tasks = []
+    previous_task = upload_scripts
     
     for domain, url in TSE_DATASETS.items():
         task = BashOperator(
@@ -99,7 +100,8 @@ with DAG(
                 --year "2022"
             '''
         )
-        upload_scripts >> task
+        previous_task >> task
+        previous_task = task
         ingestion_tasks.append(task)
 
     # Task 2: Create EMR Cluster

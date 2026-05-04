@@ -33,13 +33,22 @@ def s3_prefix_has_files(bucket: str, prefix: str) -> bool:
 def download_file(url: str, local_path: str):
     """Download large files (like ZIPs) to local path chunk by chunk"""
     logger.info(f"Downloading data from {url} to {local_path} ...")
-    with requests.get(url, stream=True) as r:
+    # Added timeout (30s connect, 300s read per chunk) to avoid infinite hang
+    with requests.get(url, stream=True, timeout=(30, 300)) as r:
         r.raise_for_status()
+        total_downloaded = 0
+        log_threshold = 50 * 1024 * 1024 # Log every 50MB
+        next_log = log_threshold
+        
         with open(local_path, 'wb') as f:
             for chunk in r.iter_content(chunk_size=CHUNK_SIZE): 
                 if chunk:
                     f.write(chunk)
-    logger.info(f"Download complete: {local_path}")
+                    total_downloaded += len(chunk)
+                    if total_downloaded >= next_log:
+                        logger.info(f"Downloaded {total_downloaded / (1024*1024):.2f} MB...")
+                        next_log += log_threshold
+    logger.info(f"Download complete: {local_path} ({total_downloaded / (1024*1024):.2f} MB)")
 
 def run_tse_ingestion(url: str, domain: str, year: str):
     """
