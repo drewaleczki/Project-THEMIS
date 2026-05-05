@@ -86,6 +86,11 @@ def run_tse_ingestion(url: str, domain: str, year: str):
             for file_info in z.infolist():
                 filename_upper = file_info.filename.upper()
                 if filename_upper.endswith('.CSV') and 'BRASIL' in filename_upper:
+                    
+                    # For prestacao_contas, we specifically want the Expenses file to calculate ROI
+                    if domain == 'prestacao_contas' and 'DESPESAS_CONTRATADAS' not in filename_upper:
+                        continue
+                        
                     logger.info(f"Found target unified file: {file_info.filename}. Extracting...")
                     z.extract(file_info, temp_dir)
                     extracted_file_path = os.path.join(temp_dir, file_info.filename)

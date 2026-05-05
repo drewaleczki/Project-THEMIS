@@ -12,7 +12,7 @@ def main(year, silver_bucket, gold_bucket):
         .getOrCreate()
 
     base_silver_path = f"s3://{silver_bucket}/tse/{{}}/silver/ano={year}/"
-    output_path = f"s3://{gold_bucket}/tse/campaign_analytics/gold/ano={year}/"
+    output_path = f"s3://{gold_bucket}/tse/campaign_analytics/ano={year}/"
 
     logger.info("Reading Silver Datasets...")
 

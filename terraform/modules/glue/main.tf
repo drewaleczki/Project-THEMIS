@@ -13,7 +13,7 @@ resource "aws_glue_crawler" "gold_crawler" {
   role          = var.glue_role_arn
 
   s3_target {
-    path = "s3://${var.gold_bucket_id}/tse/campaign_analytics/gold/"
+    path = "s3://${var.gold_bucket_id}/tse/campaign_analytics/"
   }
 
   configuration = jsonencode({
