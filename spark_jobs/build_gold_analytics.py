@@ -35,6 +35,10 @@ def main(year, silver_bucket, gold_bucket):
             cols = [c for c in df.columns if c.startswith(prefix)]
             if not cols:
                 return None
+            # Specific logic for votes: Avoid double counting 1st and 2nd round
+            if "votacao_nominal" in domain and "nr_turno" in df.columns:
+                df = df.filter(col("nr_turno") == 1)
+
             agg_exprs = [sum(c).alias(f"total_{c}") for c in cols]
             
             # fallback for sq_candidato if only nm_candidato exists
@@ -60,20 +64,22 @@ def main(year, silver_bucket, gold_bucket):
     if df_votos_agg:
         wide_df = wide_df.join(df_votos_agg, on="sq_candidato", how="left")
 
-    # Null Cleaning to Avoid Mathematical Operations with NULL
+    # Null Cleaning and Casting to Avoid Scientific Notation
     for c in wide_df.columns:
-        if c.startswith("total_"):
-            wide_df = wide_df.withColumn(c, coalesce(col(c), lit(0.0)))
+        if c.startswith("total_vr_"):
+            wide_df = wide_df.withColumn(c, coalesce(col(c), lit(0.0)).cast("decimal(15,2)"))
+        elif c.startswith("total_qt_"):
+            wide_df = wide_df.withColumn(c, coalesce(col(c), lit(0)).cast("long"))
 
     # ROI Calculation (Cost per Vote)
-    despesa_col = next((c for c in wide_df.columns if "despesa" in c and c.startswith("total_")), None)
-    voto_col = next((c for c in wide_df.columns if "votos" in c and c.startswith("total_")), None)
+    despesa_col = next((c for c in wide_df.columns if "despesa" in c and c.startswith("total_vr_")), None)
+    voto_col = next((c for c in wide_df.columns if "votos" in c and c.startswith("total_qt_")), None)
     
     if despesa_col and voto_col:
-        # If 0 votes, consider 1 to avoid division by zero
+        # If 0 votes, consider 1 to avoid division by zero. Cast to decimal for clean Athena UI.
         wide_df = wide_df.withColumn(
-            "custo_por_voto", 
-            round(col(despesa_col) / coalesce(col(voto_col), lit(1.0)), 2)
+            "custo_por_voto_reais", 
+            round(col(despesa_col) / coalesce(col(voto_col), lit(1)).cast("double"), 2).cast("decimal(10,2)")
         )
 
     logger.info(f"Writing Gold Analytics Wide Table to {output_path}")
